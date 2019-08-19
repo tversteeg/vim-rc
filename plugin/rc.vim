@@ -12,6 +12,20 @@ if exists('g:loaded_rc')
 endif
 let g:loaded_rc = 1
 
+function! s:err(msg)
+	echohl ErrorMsg
+	echom '[vim-rc] '.a:msg
+	echohl None
+endfunction
+
+function! s:trim(str)
+	return substitute(a:str, '[\/]\+$', '', '')
+endfunction
+
+function! s:path(path)
+	return s:trim(a:path)
+endfunction
+
 function! s:download_single_file(url, to)
 	if executable('curl')
 		let cmd = 'curl --fail -s -o '.shellescape(a:to).' '.shellescape(a:url)
@@ -25,19 +39,41 @@ function! s:download_single_file(url, to)
 			let cmd = '"'.cmd.'"'
 		end
 	else
-		throw 'Error curl or wget is not available'
+		return s:err('curl or wget is not available.')
 	endif
 
 	exec '!'.cmd
 
 	if (0 != v:shell_error)
-		throw 'Error running cmd:$ '.cmd
+		return s:err('Error running cmd:$ '.cmd)
+	endif
+endfunction
+
+function! s:set_home_directory()
+	" Get the home directory
+	if !empty(&rtp)
+		let g:rc_home = s:path(split(&rtp, ',')[0]).'/rc'
+	else
+		return s:err('Unable to determine home path.')
+	endif
+
+	" Create the directory if it doesn't exist
+	if !isdirectory(g:rc_home)
+		try
+			call mkdir(g:rc_home, 'p')
+		catch
+			return s:err(printf('Invalid rc directory: %s.', g:rc_home))
+		endtry
 	endif
 endfunction
 
 if exists('g:rc_url')
+	call s:set_home_directory()
+
+	let s:filename = g:rc_home.'/init.vim'
+
 	" Download the URL
-	call s:download_single_file(g:rc_url)
+	call s:download_single_file(g:rc_url, s:filename)
 
 	" Execute the file
 	if filereadable(s:filename) != 0
